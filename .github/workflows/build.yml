@@ -18,18 +18,21 @@ jobs:
         run: |
           chmod +x gradlew
           for i in 1 2 3; do
-            ./gradlew assembleDebug --no-daemon && exit 0
+            ./gradlew assembleRelease assembleDebug --no-daemon && exit 0
             echo "Lần $i thất bại, thử lại sau 30s"; sleep 30
           done
           exit 1
       - uses: actions/upload-artifact@v4
         with:
-          name: NTH_AutoNPC-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: NTH_AutoNPC-apk
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/debug/app-debug.apk
       - name: Đăng APK lên Releases (tải thẳng file .apk, không bị nén zip)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk NTH_AutoNPC.apk
+          cp app/build/outputs/apk/release/app-release.apk NTH_AutoNPC.apk
+          cp app/build/outputs/apk/debug/app-debug.apk NTH_AutoNPC_debug.apk
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest NTH_AutoNPC.apk --title "Bản mới nhất" --notes "Commit: ${{ github.sha }}"
+          gh release create latest NTH_AutoNPC.apk NTH_AutoNPC_debug.apk --title "Bản mới nhất" --notes "Commit: ${{ github.sha }}"
