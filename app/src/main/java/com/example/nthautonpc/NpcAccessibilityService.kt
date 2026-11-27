@@ -11,7 +11,9 @@ import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
+import android.graphics.Typeface
 import android.os.Handler
+import android.os.SystemClock
 import android.os.Looper
 import android.view.Display
 import android.view.Gravity
@@ -215,6 +217,7 @@ class NpcAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         showIcon()
+        showStopwatch()
         showGear()
     }
 
@@ -228,13 +231,92 @@ class NpcAccessibilityService : AccessibilityService() {
         return b.width() to b.height()
     }
 
+    /** Xếp ngang: [nút ▶] [đồng hồ] [⚙] — di chuyển nút ▶ thì cả hàng đi theo. */
     private fun placeGear() {
         val ip = iconParams ?: return
-        val gp = gearParams ?: return
-        val g = gear ?: return
-        gp.x = ip.x
-        gp.y = ip.y + gp.height + 8
-        runCatching { (getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(g, gp) }
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        val gap = 8
+        var nextX = ip.x + ip.width + gap
+        swParams?.let { sp ->
+            sp.x = nextX; sp.y = ip.y
+            stopwatch?.let { runCatching { wm.updateViewLayout(it, sp) } }
+            nextX += sp.width + gap
+        }
+        gearParams?.let { gp ->
+            gp.x = nextX; gp.y = ip.y
+            gear?.let { runCatching { wm.updateViewLayout(it, gp) } }
+        }
+    }
+
+    // ===== Đồng hồ bấm giờ (phút:giây.ms) =====
+    private var stopwatch: TextView? = null
+    private var swParams: WindowManager.LayoutParams? = null
+    private var swRunning = false
+    private var swStartAt = 0L
+
+    private fun swText(ms: Long): String {
+        val m = ms / 60_000
+        val sec = (ms / 1000) % 60
+        val milli = ms % 1000
+        return String.format(Locale.ROOT, "%02d:%02d.%03d", m, sec, milli)
+    }
+
+    private val swTick = object : Runnable {
+        override fun run() {
+            if (!swRunning) return
+            stopwatch?.text = swText(SystemClock.elapsedRealtime() - swStartAt)
+            handler.postDelayed(this, 16)
+        }
+    }
+
+    private fun showStopwatch() {
+        if (stopwatch != null) return
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        val d = resources.displayMetrics.density
+        val view = TextView(this).apply {
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            typeface = Typeface.MONOSPACE
+            text = swText(0)
+            background = GradientDrawable().apply { cornerRadius = 20 * d; setColor(0xDD37474F.toInt()) }
+            alpha = 0.9f
+        }
+        // Chạm lần 1 = bắt đầu đếm; chạm lần 2 = dừng và xóa về 0. Xử lý ngay lúc chạm xuống để không bị cú bấm tự động làm hụt.
+        view.setOnTouchListener { _, e ->
+            when (e.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    touching = true
+                    if (!swRunning) {
+                        swRunning = true
+                        swStartAt = SystemClock.elapsedRealtime()
+                        handler.removeCallbacks(swTick)
+                        handler.post(swTick)
+                    } else {
+                        swRunning = false
+                        handler.removeCallbacks(swTick)
+                        view.text = swText(0)
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    touching = false
+                    if (running) handler.post(spam)
+                    true
+                }
+                else -> true
+            }
+        }
+        val params = WindowManager.LayoutParams(
+            (110 * d).toInt(), (iconSizeDp * d).toInt(),
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply { gravity = Gravity.TOP or Gravity.START }
+        wm.addView(view, params)
+        stopwatch = view
+        swParams = params
+        placeGear()
     }
 
     private fun showGear() {
@@ -393,6 +475,10 @@ class NpcAccessibilityService : AccessibilityService() {
         handler.removeCallbacks(autoStop)
         icon?.let { runCatching { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } }
         icon = null
+        swRunning = false
+        handler.removeCallbacks(swTick)
+        stopwatch?.let { runCatching { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } }
+        stopwatch = null
         cancelEdit()
         gear?.let { runCatching { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } }
         gear = null

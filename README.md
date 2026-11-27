@@ -62,3 +62,4 @@
 - v9.2: tự dừng khi bấm Home/Recents (launcher hiện) hoặc tắt màn hình bằng nút nguồn; phím Giảm âm lượng chỉ bị chặn khi đang chạy.
 - v9.3: đang chạy thì chạm xuống nút nổi là tắt ngay (không chờ nhả tay).
 - v9.4: bỏ phím âm lượng, tự dừng Home/tắt màn hình. Chỉ bật/tắt bằng nút nổi (chạm xuống là tắt) hoặc tự tắt sau 13s.
+- v10: đồng hồ bấm giờ phút:giây.ms nằm ngang cạnh nút bật/tắt (chạm = chạy, chạm lần nữa = dừng và về 0). Hàng icon xếp ngang: ▶ | đồng hồ | ⚙.
