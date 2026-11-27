@@ -11,6 +11,8 @@
 
     <application
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="NTH Auto NPC"
         android:allowBackup="false">
 

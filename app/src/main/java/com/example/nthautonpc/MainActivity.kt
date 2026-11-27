@@ -117,7 +117,7 @@ class MainActivity : Activity() {
             })
         })
         root.addView(TextView(this).apply {
-            text = "\nChỉnh vùng quét: bật trợ năng, vào game, bấm nút ⚙ (xanh dương, dưới nút ▶) → kéo khung " +
+            text = "\nChỉnh vùng quét: bật trợ năng, vào game, giữ lâu nút ▶ để hiện nút ⚙ (xanh dương, bên phải đồng hồ), bấm ⚙ → kéo khung " +
                 "chữ nhật tới quanh nhân vật, kéo góc ⤡ để đổi kích thước, bấm LƯU."
             textSize = 14f
         })
