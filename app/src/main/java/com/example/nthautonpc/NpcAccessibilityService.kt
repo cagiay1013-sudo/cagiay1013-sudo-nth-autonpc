@@ -13,13 +13,8 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.view.Display
 import android.view.Gravity
-import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -221,10 +216,6 @@ class NpcAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         showIcon()
         showGear()
-        launcherPkg = packageManager.resolveActivity(
-            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0
-        )?.activityInfo?.packageName
-        registerReceiver(screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF))
     }
 
     // ===== Nút ⚙ + khung chỉnh vùng quét =====
@@ -390,26 +381,7 @@ class NpcAccessibilityService : AccessibilityService() {
         placeGear()
     }
 
-    /** Phím Giảm âm lượng = bật/tắt, dùng được kể cả khi đang bấm 0ms mà không chạm nổi icon. */
-    override fun onKeyEvent(event: KeyEvent): Boolean {
-        // Chỉ chặn phím khi đang chạy (để dừng); lúc không chạy phím chỉnh âm lượng bình thường
-        if (!running || event.keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) return false
-        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) stopRunning()
-        return true
-    }
-
-    // Tự dừng khi bấm nút Home / Recents (cửa sổ launcher hiện lên) hoặc khi tắt màn hình bằng nút nguồn
-    private var launcherPkg: String? = null
-    private val screenOff = object : BroadcastReceiver() {
-        override fun onReceive(c: Context?, i: Intent?) { stopRunning() }
-    }
-
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (!running || event == null) return
-        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        val pkg = event.packageName?.toString() ?: return
-        if (pkg == launcherPkg) stopRunning()
-    }
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
 
     override fun onInterrupt() {
         stopRunning()
@@ -421,7 +393,6 @@ class NpcAccessibilityService : AccessibilityService() {
         handler.removeCallbacks(autoStop)
         icon?.let { runCatching { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } }
         icon = null
-        runCatching { unregisterReceiver(screenOff) }
         cancelEdit()
         gear?.let { runCatching { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } }
         gear = null

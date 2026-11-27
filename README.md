@@ -61,3 +61,4 @@
 - v9.1: phím Giảm âm lượng bật/tắt; chạm vào icon tạm ngừng bấm để tắt được dù delay 0ms.
 - v9.2: tự dừng khi bấm Home/Recents (launcher hiện) hoặc tắt màn hình bằng nút nguồn; phím Giảm âm lượng chỉ bị chặn khi đang chạy.
 - v9.3: đang chạy thì chạm xuống nút nổi là tắt ngay (không chờ nhả tay).
+- v9.4: bỏ phím âm lượng, tự dừng Home/tắt màn hình. Chỉ bật/tắt bằng nút nổi (chạm xuống là tắt) hoặc tự tắt sau 13s.
