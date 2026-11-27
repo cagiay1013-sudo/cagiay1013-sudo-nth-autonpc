@@ -11,7 +11,15 @@ jobs:
         with:
           distribution: temurin
           java-version: '11'
-      - run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+          cache: gradle
+      - name: Build (retry vì Maven Central thỉnh thoảng báo 429)
+        run: |
+          chmod +x gradlew
+          for i in 1 2 3; do
+            ./gradlew assembleDebug --no-daemon && exit 0
+            echo "Lần $i thất bại, thử lại sau 30s"; sleep 30
+          done
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: NTH_AutoNPC-debug-apk
