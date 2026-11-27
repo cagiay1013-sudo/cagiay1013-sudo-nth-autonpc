@@ -15,6 +15,7 @@ import android.graphics.Typeface
 import android.os.Handler
 import android.os.SystemClock
 import android.os.Looper
+import android.view.Choreographer
 import android.view.Display
 import android.view.Gravity
 import android.view.MotionEvent
@@ -25,7 +26,6 @@ import android.widget.TextView
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import java.text.Normalizer
 import java.util.Locale
 
 class NpcAccessibilityService : AccessibilityService() {
@@ -87,12 +87,14 @@ class NpcAccessibilityService : AccessibilityService() {
                     val cy = (bitmap.height * reg[1]).toInt().coerceIn(0, bitmap.height - 1)
                     val cw = (bitmap.width * (reg[2] - reg[0])).toInt().coerceIn(1, bitmap.width - cx)
                     val ch = (bitmap.height * (reg[3] - reg[1])).toInt().coerceIn(1, bitmap.height - cy)
+                    val screenH = bitmap.height
                     val cropped = Bitmap.createBitmap(bitmap, cx, cy, cw, ch)
+                    if (cropped !== bitmap) bitmap.recycle()   // giải phóng ảnh toàn màn hình ngay, chỉ giữ vùng nhỏ
                     recognizer.process(InputImage.fromBitmap(cropped, 0))
                         .addOnSuccessListener { visionText ->
                             if (!running) return@addOnSuccessListener
                             val lines = visionText.textBlocks.flatMap { it.lines }
-                            val texts = lines.map { normalize(it.text).replace(" ", "") to it }
+                            val texts = lines.map { NpcStore.key(it.text) to it }
                             fun find(match: (String) -> Boolean) =
                                 texts.firstOrNull { match(it.first) }?.second?.boundingBox
 
@@ -105,7 +107,7 @@ class NpcAccessibilityService : AccessibilityService() {
                                     val x = it.exactCenterX() + cx
                                     val y = it.exactCenterY() + cy
                                     npc.add(PointF(x, y))                                   // tên (đầu NPC)
-                                    if (body > 0) npc.add(PointF(x, (y + body).coerceAtMost(bitmap.height - 1f))) // thân NPC
+                                    if (body > 0) npc.add(PointF(x, (y + body).coerceAtMost(screenH - 1f))) // thân NPC
                                 }
                             }
                             if (npc.isNotEmpty()) npcPoints = npc
@@ -119,7 +121,6 @@ class NpcAccessibilityService : AccessibilityService() {
                         }
                         .addOnCompleteListener {
                             cropped.recycle()
-                            bitmap.recycle()
                             busy = false
                             schedule(scanDelayMs)
                         }
@@ -127,7 +128,9 @@ class NpcAccessibilityService : AccessibilityService() {
 
                 override fun onFailure(errorCode: Int) {
                     busy = false
-                    schedule(retryDelayMs)
+                    // Android chỉ cho chụp cách nhau ~0,3s: thử lại 0ms chỉ làm CPU quay vô ích, nên đợi 10ms
+                    val gap = if (errorCode == ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT) 10L else 0L
+                    schedule(maxOf(retryDelayMs, gap))
                 }
             })
         }
@@ -169,12 +172,6 @@ class NpcAccessibilityService : AccessibilityService() {
             }
         }, handler)
         if (!dispatched) { tapping = false; if (running) handler.post(spam) }
-    }
-
-    private fun normalize(s: String): String {
-        return Normalizer.normalize(s.lowercase(Locale.ROOT), Normalizer.Form.NFD)
-            .replace("\\p{Mn}+".toRegex(), "")
-            .replace("đ", "d")
     }
 
     private fun schedule(delayMs: Long) {
@@ -261,11 +258,13 @@ class NpcAccessibilityService : AccessibilityService() {
         return String.format(Locale.ROOT, "%02d:%02d.%03d", m, sec, milli)
     }
 
-    private val swTick = object : Runnable {
-        override fun run() {
+    private val swTick = object : Choreographer.FrameCallback {
+        private var last = ""
+        override fun doFrame(frameTimeNanos: Long) {
             if (!swRunning) return
-            stopwatch?.text = swText(SystemClock.elapsedRealtime() - swStartAt)
-            handler.postDelayed(this, 16)
+            val t = swText(SystemClock.elapsedRealtime() - swStartAt)
+            if (t != last) { last = t; stopwatch?.text = t }
+            Choreographer.getInstance().postFrameCallback(this)   // bám nhịp vẽ màn hình, mượt và nhẹ hơn hẹn giờ 16ms
         }
     }
 
@@ -316,11 +315,11 @@ class NpcAccessibilityService : AccessibilityService() {
                         if (!swRunning) {
                             swRunning = true
                             swStartAt = SystemClock.elapsedRealtime()
-                            handler.removeCallbacks(swTick)
-                            handler.post(swTick)
+                            Choreographer.getInstance().removeFrameCallback(swTick)
+                            Choreographer.getInstance().postFrameCallback(swTick)
                         } else {
                             swRunning = false
-                            handler.removeCallbacks(swTick)
+                            Choreographer.getInstance().removeFrameCallback(swTick)
                             view.text = swText(0)
                         }
                     }
@@ -499,7 +498,7 @@ class NpcAccessibilityService : AccessibilityService() {
         icon?.let { runCatching { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } }
         icon = null
         swRunning = false
-        handler.removeCallbacks(swTick)
+        Choreographer.getInstance().removeFrameCallback(swTick)
         stopwatch?.let { runCatching { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } }
         stopwatch = null
         cancelEdit()
