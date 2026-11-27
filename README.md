@@ -66,3 +66,4 @@
 - v10.1: thêm icon app (adaptive + mipmap PNG), sửa chú thích vị trí nút ⚙.
 - v10.2: kéo đồng hồ để di chuyển cả hàng nút; rút gọn chú thích màn hình chính.
 - v11: tối ưu: R8 + shrink resources, chỉ ABI ARM, giải phóng bitmap sớm, đồng hồ dùng Choreographer, không quay CPU khi Android từ chối chụp quá nhanh. Release có thêm bản debug dự phòng NTH_AutoNPC_debug.apk.
+- v11.1: bật là spam bấm ngay trong 13 giây (giữ vị trí đã nhớ giữa các lần chạy, không xóa khi bật).

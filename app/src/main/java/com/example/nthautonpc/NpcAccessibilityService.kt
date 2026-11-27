@@ -184,7 +184,7 @@ class NpcAccessibilityService : AccessibilityService() {
         running = true
         busy = false
         tapping = false
-        npcPoints = emptyList(); dialogPoint = null; wantedPoint = null
+        // Giữ lại vị trí đã nhớ từ lần chạy trước: bật là bấm liên tục ngay (0ms), không chờ OCR tìm lại
         gear?.visibility = View.GONE
         updateIcon()
         handler.removeCallbacks(loop)
