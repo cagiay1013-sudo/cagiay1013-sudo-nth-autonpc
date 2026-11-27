@@ -34,11 +34,7 @@ class MainActivity : Activity() {
         root.addView(TextView(this).apply {
             text = "NTH Auto NPC\n\n" +
                 "1. Bấm “MỞ CÀI ĐẶT TRỢ NĂNG” > NTH Auto NPC > Bật.\n" +
-                "   (Android 13+: nếu bị chặn, vào Cài đặt > Ứng dụng > NTH Auto NPC > ⋮ > " +
-                "“Cho phép cài đặt bị hạn chế”, rồi bật lại.)\n" +
-                "2. Mở game và đứng tại NPC.\n" +
-                "3. Bảng nổi START/STOP sẽ hiện trên màn hình, bấm START.\n\n" +
-                "Ứng dụng quét liên tục, thấy tên NPC / “Đối thoại” / “Đi tới truy nã” thì chạm tất cả cùng 1 lúc."
+                "2. Mở game và đứng tại NPC.\n"
             textSize = 16f
         })
         root.addView(Button(this).apply {

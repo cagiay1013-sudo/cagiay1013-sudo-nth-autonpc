@@ -282,25 +282,48 @@ class NpcAccessibilityService : AccessibilityService() {
             background = GradientDrawable().apply { cornerRadius = 20 * d; setColor(0xDD37474F.toInt()) }
             alpha = 0.9f
         }
-        // Chạm lần 1 = bắt đầu đếm; chạm lần 2 = dừng và xóa về 0. Xử lý ngay lúc chạm xuống để không bị cú bấm tự động làm hụt.
+        // Chạm nhanh: lần 1 = bắt đầu đếm, lần 2 = dừng và xóa về 0. Kéo = di chuyển cả hàng nút (giống nút ▶).
+        var downX = 0f; var downY = 0f
+        var startX = 0; var startY = 0
+        var moved = false
+        val slop = 12 * d
         view.setOnTouchListener { _, e ->
             when (e.action) {
                 MotionEvent.ACTION_DOWN -> {
                     touching = true
-                    if (!swRunning) {
-                        swRunning = true
-                        swStartAt = SystemClock.elapsedRealtime()
-                        handler.removeCallbacks(swTick)
-                        handler.post(swTick)
-                    } else {
-                        swRunning = false
-                        handler.removeCallbacks(swTick)
-                        view.text = swText(0)
+                    downX = e.rawX; downY = e.rawY
+                    startX = iconParams?.x ?: 0; startY = iconParams?.y ?: 0
+                    moved = false
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = e.rawX - downX
+                    val dy = e.rawY - downY
+                    if (moved || Math.abs(dx) > slop || Math.abs(dy) > slop) {
+                        moved = true
+                        iconParams?.let { ip ->
+                            ip.x = startX + dx.toInt()
+                            ip.y = startY + dy.toInt()
+                            icon?.let { runCatching { wm.updateViewLayout(it, ip) } }
+                        }
+                        placeGear()
                     }
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     touching = false
+                    if (e.action == MotionEvent.ACTION_UP && !moved) {
+                        if (!swRunning) {
+                            swRunning = true
+                            swStartAt = SystemClock.elapsedRealtime()
+                            handler.removeCallbacks(swTick)
+                            handler.post(swTick)
+                        } else {
+                            swRunning = false
+                            handler.removeCallbacks(swTick)
+                            view.text = swText(0)
+                        }
+                    }
                     if (running) handler.post(spam)
                     true
                 }
