@@ -15,6 +15,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Display
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -45,6 +46,7 @@ class NpcAccessibilityService : AccessibilityService() {
     private var running = false
     private var busy = false
     private var tapping = false
+    @Volatile private var touching = false   // đang chạm vào icon: tạm ngừng bấm để chạm được nút bật/tắt
 
     // Vị trí đã nhớ (cập nhật mỗi khi OCR thấy). Vòng bấm đọc từ đây nên không phải chờ chụp màn hình + OCR.
     @Volatile private var npcPoints: List<PointF> = emptyList()   // tên + thân NPC
@@ -55,7 +57,7 @@ class NpcAccessibilityService : AccessibilityService() {
     private val spam = object : Runnable {
         override fun run() {
             if (!running) return
-            if (tapping) return
+            if (tapping || touching) return
             val pts = ArrayList<PointF>(npcPoints)
             dialogPoint?.let { pts.add(it) }
             wantedPoint?.let { pts.add(it) }
@@ -112,7 +114,7 @@ class NpcAccessibilityService : AccessibilityService() {
                             find { it.contains("ditoitruyna") || it.contains("truyna") }?.let {
                                 wantedPoint = PointF(it.exactCenterX() + cx, it.exactCenterY() + cy)
                             }
-                            if (!tapping) handler.post(spam)   // có vị trí mới thì bấm ngay, không chờ
+                            if (!tapping && !touching) handler.post(spam)   // có vị trí mới thì bấm ngay, không chờ
                         }
                         .addOnCompleteListener {
                             cropped.recycle()
@@ -334,6 +336,7 @@ class NpcAccessibilityService : AccessibilityService() {
             when (e.action) {
                 MotionEvent.ACTION_DOWN -> {
                     longPressed = false
+                    touching = true
                     handler.postDelayed(longPress, 600)
                     downX = e.rawX; downY = e.rawY
                     startX = params.x; startY = params.y
@@ -353,11 +356,12 @@ class NpcAccessibilityService : AccessibilityService() {
                     }
                     true
                 }
-                MotionEvent.ACTION_UP -> {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     handler.removeCallbacks(longPress)
-                    if (!moved && !longPressed) {
+                    touching = false
+                    if (e.action == MotionEvent.ACTION_UP && !moved && !longPressed) {
                         if (running) stopRunning() else startRunning()
-                    }
+                    } else if (running) handler.post(spam)
                     true
                 }
                 else -> false
@@ -369,6 +373,15 @@ class NpcAccessibilityService : AccessibilityService() {
         iconParams = params
         updateIcon()
         placeGear()
+    }
+
+    /** Phím Giảm âm lượng = bật/tắt, dùng được kể cả khi đang bấm 0ms mà không chạm nổi icon. */
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) return false
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            if (running) stopRunning() else startRunning()
+        }
+        return true
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}

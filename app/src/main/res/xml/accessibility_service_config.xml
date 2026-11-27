@@ -6,4 +6,5 @@
     android:canRetrieveWindowContent="false"
     android:canPerformGestures="true"
     android:canTakeScreenshot="true"
-    android:accessibilityFlags="flagDefault" />
+    android:canRequestFilterKeyEvents="true"
+    android:accessibilityFlags="flagDefault|flagRequestFilterKeyEvents" />
