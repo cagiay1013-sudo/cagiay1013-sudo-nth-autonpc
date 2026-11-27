@@ -338,13 +338,20 @@ class NpcAccessibilityService : AccessibilityService() {
         var startX = 0; var startY = 0
         var moved = false
         var longPressed = false
+        var stoppedOnDown = false
         val longPress = Runnable { longPressed = true; toggleGear() }
         val slop = 12 * resources.displayMetrics.density
         view.setOnTouchListener { _, e ->
             when (e.action) {
                 MotionEvent.ACTION_DOWN -> {
                     longPressed = false
+                    stoppedOnDown = false
                     touching = true
+                    if (running) {            // đang chạy: chỉ cần CHẠM XUỐNG nút là tắt ngay, không chờ nhả tay
+                        stoppedOnDown = true
+                        stopRunning()
+                        return@setOnTouchListener true
+                    }
                     handler.postDelayed(longPress, 600)
                     downX = e.rawX; downY = e.rawY
                     startX = params.x; startY = params.y
@@ -354,7 +361,7 @@ class NpcAccessibilityService : AccessibilityService() {
                 MotionEvent.ACTION_MOVE -> {
                     val dx = e.rawX - downX
                     val dy = e.rawY - downY
-                    if (moved || Math.abs(dx) > slop || Math.abs(dy) > slop) {
+                    if (!stoppedOnDown && (moved || Math.abs(dx) > slop || Math.abs(dy) > slop)) {
                         moved = true
                         handler.removeCallbacks(longPress)
                         params.x = startX + dx.toInt()
@@ -367,7 +374,7 @@ class NpcAccessibilityService : AccessibilityService() {
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     handler.removeCallbacks(longPress)
                     touching = false
-                    if (e.action == MotionEvent.ACTION_UP && !moved && !longPressed) {
+                    if (e.action == MotionEvent.ACTION_UP && !moved && !longPressed && !stoppedOnDown) {
                         if (running) stopRunning() else startRunning()
                     } else if (running) handler.post(spam)
                     true
