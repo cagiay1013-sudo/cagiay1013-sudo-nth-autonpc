@@ -68,10 +68,11 @@ class NpcAccessibilityService : AccessibilityService() {
             val now = SystemClock.elapsedRealtime()
             // Thấy BẤT KỲ mục tiêu nào trong thời gian gần đây -> bấm tất cả vị trí đã biết cùng lúc,
             // kể cả nút chưa hiện ra (Đối thoại / Đi tới truy nã) nên không phải chờ OCR thấy từng nút.
-            val seen = now - npcAt <= pointValidMs || now - dialogAt <= pointValidMs || now - wantedAt <= pointValidMs
+            val blind = NpcStore.isBlind(this@NpcAccessibilityService)
+            val seen = blind || now - npcAt <= pointValidMs || now - dialogAt <= pointValidMs || now - wantedAt <= pointValidMs
             if (!seen) return   // không thấy gì: không bấm, để chạm/di chuyển bình thường (OCR thấy chữ là gọi lại ngay)
             val pts = ArrayList<PointF>()
-            if (now - npcAt <= npcKeepMs) pts.addAll(npcPoints)
+            if (blind || now - npcAt <= npcKeepMs) pts.addAll(npcPoints)
             dialogPoint?.let { pts.add(it) }
             wantedPoint?.let { pts.add(it) }
             if (pts.isEmpty()) return

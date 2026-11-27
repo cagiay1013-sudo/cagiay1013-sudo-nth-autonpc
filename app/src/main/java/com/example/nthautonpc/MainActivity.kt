@@ -10,6 +10,7 @@ import android.text.TextWatcher
 import android.view.Gravity
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -94,6 +95,14 @@ class MainActivity : Activity() {
         })
         root.addView(listBox)
         refresh()
+
+        // ===== Chế độ bấm liên tục (không chờ nhận chữ) =====
+        root.addView(CheckBox(this).apply {
+            text = "Bấm liên tục như auto-click (nhanh nhất): bật là bấm ngay các vị trí đã nhớ suốt 13 giây, " +
+                "không cần thấy chữ. Lúc bật sẽ không chạm/di chuyển màn hình được."
+            isChecked = NpcStore.isBlind(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> NpcStore.setBlind(this@MainActivity, on) }
+        })
 
         // ===== Bấm thêm vào thân NPC =====
         root.addView(TextView(this).apply {

@@ -78,4 +78,12 @@ object NpcStore {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putFloat(key + "x", x).putFloat(key + "y", y).apply()
     }
+
+    // ===== Chế độ bấm liên tục: bấm vị trí đã nhớ suốt 13 giây, không cần OCR vừa thấy chữ =====
+    fun isBlind(ctx: Context): Boolean =
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("blind", false)
+
+    fun setBlind(ctx: Context, on: Boolean) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("blind", on).apply()
+    }
 }
