@@ -57,3 +57,4 @@
 - v7.4: giảm RAM build: -Xmx768m, Metaspace 256m, code cache 64m, tắt incremental/parallel/caching, Kotlin chạy in-process.
 - v8: nút ⚙ trên màn hình mở khung chữ nhật kéo/đổi cỡ để chọn vùng quét (LƯU/✕). Bấm tên NPC (đầu) + thân NPC (offset px chỉnh trong app) cùng lúc với Đối thoại / Đi tới truy nã.
 - v8.1: thêm .github/workflows/build.yml để build APK trên GitHub Actions khi JVM trên điện thoại bị crash.
+- v9: vòng bấm tách khỏi vòng quét chữ: nhớ vị trí tên NPC/thân/Đối thoại/Đi tới truy nã rồi bấm liên tục cùng lúc, không chờ chụp màn hình + OCR (Android giới hạn chụp ≥ ~330ms/lần nên trước đây bị chậm). Nút ⚙ ẩn mặc định: giữ lâu nút ▶ để hiện/ẩn.

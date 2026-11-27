@@ -16,6 +16,7 @@ import android.os.Looper
 import android.view.Display
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.TextView
@@ -35,8 +36,7 @@ class NpcAccessibilityService : AccessibilityService() {
     private val runDurationMs = 13_000L   // tự tắt sau bao lâu kể từ lúc bật
     // Tên NPC lấy từ danh sách người dùng nhập trong app (NpcStore), không sửa ở đây nữa
     // Vùng quét chỉnh bằng nút ⚙ trên màn hình (kéo khung chữ nhật rồi bấm LƯU)
-    private val repeatCycle = true        // true: xong thì lặp lại từ đầu cho tới khi hết giờ
-    // ===================================
+        // ===================================
 
     private val handler = Handler(Looper.getMainLooper())
     private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
@@ -45,6 +45,24 @@ class NpcAccessibilityService : AccessibilityService() {
     private var running = false
     private var busy = false
     private var tapping = false
+
+    // Vị trí đã nhớ (cập nhật mỗi khi OCR thấy). Vòng bấm đọc từ đây nên không phải chờ chụp màn hình + OCR.
+    @Volatile private var npcPoints: List<PointF> = emptyList()   // tên + thân NPC
+    @Volatile private var dialogPoint: PointF? = null
+    @Volatile private var wantedPoint: PointF? = null
+
+    // Vòng bấm liên tục, độc lập với vòng quét chữ
+    private val spam = object : Runnable {
+        override fun run() {
+            if (!running) return
+            if (tapping) return
+            val pts = ArrayList<PointF>(npcPoints)
+            dialogPoint?.let { pts.add(it) }
+            wantedPoint?.let { pts.add(it) }
+            if (pts.isEmpty()) { handler.postDelayed(this, 10); return }
+            tapAll(pts)
+        }
+    }
 
     private val autoStop = Runnable { stopRunning() }
 
@@ -69,30 +87,31 @@ class NpcAccessibilityService : AccessibilityService() {
                     val cropped = Bitmap.createBitmap(bitmap, cx, cy, cw, ch)
                     recognizer.process(InputImage.fromBitmap(cropped, 0))
                         .addOnSuccessListener { visionText ->
-                            if (!running || tapping) return@addOnSuccessListener
+                            if (!running) return@addOnSuccessListener
                             val lines = visionText.textBlocks.flatMap { it.lines }
                             val texts = lines.map { normalize(it.text).replace(" ", "") to it }
                             fun find(match: (String) -> Boolean) =
                                 texts.firstOrNull { match(it.first) }?.second?.boundingBox
 
-                            // Tên NPC + Đối thoại + Đi tới truy nã: thấy cái nào bấm cái đó, tất cả cùng 1 lúc
-                            val points = ArrayList<PointF>()
                             val body = NpcStore.getBodyOffset(this@NpcAccessibilityService)
+                            val npc = ArrayList<PointF>()
                             for (name in NpcStore.getNames(this@NpcAccessibilityService)) {
                                 val k = NpcStore.key(name)
                                 if (k.isEmpty()) continue
                                 find { it.contains(k) }?.let {
                                     val x = it.exactCenterX() + cx
                                     val y = it.exactCenterY() + cy
-                                    points.add(PointF(x, y))                                   // tên (đầu NPC)
-                                    if (body > 0) points.add(PointF(x, (y + body).coerceAtMost(bitmap.height - 1f))) // thân NPC
+                                    npc.add(PointF(x, y))                                   // tên (đầu NPC)
+                                    if (body > 0) npc.add(PointF(x, (y + body).coerceAtMost(bitmap.height - 1f))) // thân NPC
                                 }
                             }
-                            val dialog = find { it.contains("doithoai") }
-                            val wanted = find { it.contains("ditoitruyna") || it.contains("truyna") }
-                            if (dialog != null) points.add(PointF(dialog.exactCenterX() + cx, dialog.exactCenterY() + cy))
-                            if (wanted != null) points.add(PointF(wanted.exactCenterX() + cx, wanted.exactCenterY() + cy))
-                            if (points.isNotEmpty()) tapAll(points, wanted != null)
+                            if (npc.isNotEmpty()) npcPoints = npc
+                            find { it.contains("doithoai") }?.let {
+                                dialogPoint = PointF(it.exactCenterX() + cx, it.exactCenterY() + cy)
+                            }
+                            find { it.contains("ditoitruyna") || it.contains("truyna") }?.let {
+                                wantedPoint = PointF(it.exactCenterX() + cx, it.exactCenterY() + cy)
+                            }
                         }
                         .addOnCompleteListener {
                             cropped.recycle()
@@ -124,8 +143,8 @@ class NpcAccessibilityService : AccessibilityService() {
         }
     }
 
-    /** Chạm tất cả các điểm CÙNG 1 LÚC (mọi nét bắt đầu ở 0ms trong một cử chỉ). finishedCycle = true khi đã bấm "Đi tới truy nã". */
-    private fun tapAll(points: List<PointF>, finishedCycle: Boolean) {
+    /** Chạm tất cả các điểm CÙNG 1 LÚC (mọi nét bắt đầu ở 0ms trong một cử chỉ), xong là bấm lại ngay. */
+    private fun tapAll(points: List<PointF>) {
         if (tapping || points.isEmpty()) return
         tapping = true
         val builder = GestureDescription.Builder()
@@ -137,14 +156,15 @@ class NpcAccessibilityService : AccessibilityService() {
         val dispatched = dispatchGesture(builder.build(), object : GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
                 tapping = false
-                if (running && finishedCycle && !repeatCycle) stopRunning()
+                if (running) handler.post(spam)
             }
 
             override fun onCancelled(gestureDescription: GestureDescription?) {
                 tapping = false
+                if (running) handler.post(spam)
             }
         }, handler)
-        if (!dispatched) tapping = false
+        if (!dispatched) { tapping = false; if (running) handler.postDelayed(spam, 10) }
     }
 
     private fun normalize(s: String): String {
@@ -163,16 +183,21 @@ class NpcAccessibilityService : AccessibilityService() {
         running = true
         busy = false
         tapping = false
+        npcPoints = emptyList(); dialogPoint = null; wantedPoint = null
+        gear?.visibility = View.GONE
         updateIcon()
         handler.removeCallbacks(loop)
+        handler.removeCallbacks(spam)
         handler.removeCallbacks(autoStop)
         handler.postDelayed(autoStop, runDurationMs)
         handler.post(loop)
+        handler.post(spam)
     }
 
     private fun stopRunning() {
         running = false
         handler.removeCallbacks(loop)
+        handler.removeCallbacks(spam)
         handler.removeCallbacks(autoStop)
         updateIcon()
     }
@@ -232,9 +257,16 @@ class NpcAccessibilityService : AccessibilityService() {
             gravity = Gravity.TOP or Gravity.START
         }
         wm.addView(view, params)
+        view.visibility = View.GONE   // ẩn mặc định; giữ lâu nút ▶ để hiện/ẩn
         gear = view
         gearParams = params
         placeGear()
+    }
+
+    private fun toggleGear() {
+        val g = gear ?: return
+        if (g.visibility == View.VISIBLE) { cancelEdit(); g.visibility = View.GONE }
+        else if (!running) g.visibility = View.VISIBLE
     }
 
     private fun startEdit() {
@@ -294,10 +326,14 @@ class NpcAccessibilityService : AccessibilityService() {
         var downX = 0f; var downY = 0f
         var startX = 0; var startY = 0
         var moved = false
+        var longPressed = false
+        val longPress = Runnable { longPressed = true; toggleGear() }
         val slop = 12 * resources.displayMetrics.density
         view.setOnTouchListener { _, e ->
             when (e.action) {
                 MotionEvent.ACTION_DOWN -> {
+                    longPressed = false
+                    handler.postDelayed(longPress, 600)
                     downX = e.rawX; downY = e.rawY
                     startX = params.x; startY = params.y
                     moved = false
@@ -308,6 +344,7 @@ class NpcAccessibilityService : AccessibilityService() {
                     val dy = e.rawY - downY
                     if (moved || Math.abs(dx) > slop || Math.abs(dy) > slop) {
                         moved = true
+                        handler.removeCallbacks(longPress)
                         params.x = startX + dx.toInt()
                         params.y = startY + dy.toInt()
                         runCatching { wm.updateViewLayout(view, params) }
@@ -316,7 +353,8 @@ class NpcAccessibilityService : AccessibilityService() {
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!moved) {
+                    handler.removeCallbacks(longPress)
+                    if (!moved && !longPressed) {
                         if (running) stopRunning() else startRunning()
                     }
                     true
