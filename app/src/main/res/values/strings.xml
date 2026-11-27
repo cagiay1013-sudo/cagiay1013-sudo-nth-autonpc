@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Mouse Mapper</string>
+    <string name="service_description">Gán nút chuột thành chạm màn hình, macro và xoay camera cho game mobile.</string>
+</resources>
