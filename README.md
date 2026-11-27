@@ -68,3 +68,4 @@
 - v11: tối ưu: R8 + shrink resources, chỉ ABI ARM, giải phóng bitmap sớm, đồng hồ dùng Choreographer, không quay CPU khi Android từ chối chụp quá nhanh. Release có thêm bản debug dự phòng NTH_AutoNPC_debug.apk.
 - v11.1: bật là spam bấm ngay trong 13 giây (giữ vị trí đã nhớ giữa các lần chạy, không xóa khi bật).
 - v11.2: chỉ bấm khi OCR vừa thấy tên NPC/Đối thoại/Đi tới truy nã (vị trí nhớ hết hạn sau 1200ms) -> không thấy gì thì không bấm, di chuyển/chạm màn hình bình thường.
+- v12: nhanh hơn: chụp màn hình song song với OCR; thấy bất kỳ mục tiêu nào là bấm luôn mọi vị trí đã biết (kể cả nút chưa hiện), vị trí Đối thoại/Đi tới truy nã được nhớ qua các lần mở app.

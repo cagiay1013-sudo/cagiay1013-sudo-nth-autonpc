@@ -34,6 +34,7 @@ class NpcAccessibilityService : AccessibilityService() {
     private val scanDelayMs = 0L          // nghỉ giữa 2 lần quét: 0 = quét liên tục
     private val retryDelayMs = 0L         // nghỉ khi chụp màn hình bị Android từ chối vì quá nhanh
     private val pointValidMs = 1200L     // vị trí đã nhớ chỉ có hiệu lực chừng này ms sau lần cuối OCR thấy; hết hạn thì ngừng bấm để chạm màn hình bình thường
+    private val npcKeepMs = 5000L        // vị trí NPC còn dùng được chừng này ms sau lần cuối thấy tên (khi chỉ thấy nút)
     private val tapDurationMs = 1L        // thời gian giữ ngón tay khi chạm (Android cần > 0 mới nhận chạm, 1ms là nhỏ nhất)
     private val iconSizeDp = 40           // kích thước icon nổi
     private val runDurationMs = 13_000L   // tự tắt sau bao lâu kể từ lúc bật
@@ -47,6 +48,7 @@ class NpcAccessibilityService : AccessibilityService() {
     private var iconParams: WindowManager.LayoutParams? = null
     private var running = false
     private var busy = false
+    @Volatile private var ocrBusy = false
     private var tapping = false
     @Volatile private var touching = false   // đang chạm vào icon: tạm ngừng bấm để chạm được nút bật/tắt
 
@@ -64,11 +66,15 @@ class NpcAccessibilityService : AccessibilityService() {
             if (!running) return
             if (tapping || touching) return
             val now = SystemClock.elapsedRealtime()
+            // Thấy BẤT KỲ mục tiêu nào trong thời gian gần đây -> bấm tất cả vị trí đã biết cùng lúc,
+            // kể cả nút chưa hiện ra (Đối thoại / Đi tới truy nã) nên không phải chờ OCR thấy từng nút.
+            val seen = now - npcAt <= pointValidMs || now - dialogAt <= pointValidMs || now - wantedAt <= pointValidMs
+            if (!seen) return   // không thấy gì: không bấm, để chạm/di chuyển bình thường (OCR thấy chữ là gọi lại ngay)
             val pts = ArrayList<PointF>()
-            if (now - npcAt <= pointValidMs) pts.addAll(npcPoints)
-            if (now - dialogAt <= pointValidMs) dialogPoint?.let { pts.add(it) }
-            if (now - wantedAt <= pointValidMs) wantedPoint?.let { pts.add(it) }
-            if (pts.isEmpty()) return   // chưa có vị trí nào: OCR thấy chữ là gọi lại ngay (0ms)
+            if (now - npcAt <= npcKeepMs) pts.addAll(npcPoints)
+            dialogPoint?.let { pts.add(it) }
+            wantedPoint?.let { pts.add(it) }
+            if (pts.isEmpty()) return
             tapAll(pts)
         }
     }
@@ -96,6 +102,16 @@ class NpcAccessibilityService : AccessibilityService() {
                     val screenH = bitmap.height
                     val cropped = Bitmap.createBitmap(bitmap, cx, cy, cw, ch)
                     if (cropped !== bitmap) bitmap.recycle()   // giải phóng ảnh toàn màn hình ngay, chỉ giữ vùng nhỏ
+                    // Đang OCR khung trước: bỏ khung này, chụp tiếp ngay (không để OCR kéo chậm nhịp chụp)
+                    if (ocrBusy) {
+                        cropped.recycle()
+                        busy = false
+                        schedule(scanDelayMs)
+                        return
+                    }
+                    ocrBusy = true
+                    busy = false
+                    schedule(scanDelayMs)   // chụp khung kế tiếp NGAY, chạy song song với OCR
                     recognizer.process(InputImage.fromBitmap(cropped, 0))
                         .addOnSuccessListener { visionText ->
                             if (!running) return@addOnSuccessListener
@@ -119,17 +135,20 @@ class NpcAccessibilityService : AccessibilityService() {
                             val now = SystemClock.elapsedRealtime()
                             if (npc.isNotEmpty()) { npcPoints = npc; npcAt = now }
                             find { it.contains("doithoai") }?.let {
-                                dialogPoint = PointF(it.exactCenterX() + cx, it.exactCenterY() + cy); dialogAt = now
+                                val pt = PointF(it.exactCenterX() + cx, it.exactCenterY() + cy)
+                                if (moved(dialogPoint, pt)) NpcStore.setPoint(this@NpcAccessibilityService, "dlg", pt.x, pt.y)
+                                dialogPoint = pt; dialogAt = now
                             }
                             find { it.contains("ditoitruyna") || it.contains("truyna") }?.let {
-                                wantedPoint = PointF(it.exactCenterX() + cx, it.exactCenterY() + cy); wantedAt = now
+                                val pt = PointF(it.exactCenterX() + cx, it.exactCenterY() + cy)
+                                if (moved(wantedPoint, pt)) NpcStore.setPoint(this@NpcAccessibilityService, "wnt", pt.x, pt.y)
+                                wantedPoint = pt; wantedAt = now
                             }
                             if (!tapping && !touching) handler.post(spam)   // có vị trí mới thì bấm ngay, không chờ
                         }
                         .addOnCompleteListener {
                             cropped.recycle()
-                            busy = false
-                            schedule(scanDelayMs)
+                            ocrBusy = false
                         }
                 }
 
@@ -142,6 +161,9 @@ class NpcAccessibilityService : AccessibilityService() {
             })
         }
     }
+
+    private fun moved(old: PointF?, now: PointF): Boolean =
+        old == null || Math.abs(old.x - now.x) > 6f || Math.abs(old.y - now.y) > 6f
 
     private fun toSoftwareBitmap(result: ScreenshotResult): Bitmap? {
         val buffer = result.hardwareBuffer
@@ -220,6 +242,8 @@ class NpcAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        NpcStore.getPoint(this, "dlg")?.let { dialogPoint = PointF(it[0], it[1]) }
+        NpcStore.getPoint(this, "wnt")?.let { wantedPoint = PointF(it[0], it[1]) }
         showIcon()
         showStopwatch()
         showGear()

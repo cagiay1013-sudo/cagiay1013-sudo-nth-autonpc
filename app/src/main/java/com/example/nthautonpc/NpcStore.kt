@@ -66,4 +66,16 @@ object NpcStore {
     fun setBodyOffset(ctx: Context, px: Int) {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt("body", px.coerceIn(0, 1000)).apply()
     }
+
+    // ===== Vị trí nút "Đối thoại" / "Đi tới truy nã" đã thấy (px), nhớ qua các lần mở app =====
+    fun getPoint(ctx: Context, key: String): FloatArray? {
+        val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!p.contains(key + "x")) return null
+        return floatArrayOf(p.getFloat(key + "x", 0f), p.getFloat(key + "y", 0f))
+    }
+
+    fun setPoint(ctx: Context, key: String, x: Float, y: Float) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putFloat(key + "x", x).putFloat(key + "y", y).apply()
+    }
 }
