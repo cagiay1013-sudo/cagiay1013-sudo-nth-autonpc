@@ -59,3 +59,4 @@
 - v8.1: thêm .github/workflows/build.yml để build APK trên GitHub Actions khi JVM trên điện thoại bị crash.
 - v9: vòng bấm tách khỏi vòng quét chữ: nhớ vị trí tên NPC/thân/Đối thoại/Đi tới truy nã rồi bấm liên tục cùng lúc, không chờ chụp màn hình + OCR (Android giới hạn chụp ≥ ~330ms/lần nên trước đây bị chậm). Nút ⚙ ẩn mặc định: giữ lâu nút ▶ để hiện/ẩn.
 - v9.1: phím Giảm âm lượng bật/tắt; chạm vào icon tạm ngừng bấm để tắt được dù delay 0ms.
+- v9.2: tự dừng khi bấm Home/Recents (launcher hiện) hoặc tắt màn hình bằng nút nguồn; phím Giảm âm lượng chỉ bị chặn khi đang chạy.
