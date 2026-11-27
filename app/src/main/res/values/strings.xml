@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">NTH Auto NPC</string>
+    <string name="service_description">Nhận diện nút hội thoại và Đi tới truy nã để tự chạm.</string>
+</resources>
