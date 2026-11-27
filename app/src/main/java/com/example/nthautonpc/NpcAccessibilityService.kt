@@ -59,7 +59,7 @@ class NpcAccessibilityService : AccessibilityService() {
             val pts = ArrayList<PointF>(npcPoints)
             dialogPoint?.let { pts.add(it) }
             wantedPoint?.let { pts.add(it) }
-            if (pts.isEmpty()) { handler.postDelayed(this, 10); return }
+            if (pts.isEmpty()) return   // chưa có vị trí nào: OCR thấy chữ là gọi lại ngay (0ms)
             tapAll(pts)
         }
     }
@@ -112,6 +112,7 @@ class NpcAccessibilityService : AccessibilityService() {
                             find { it.contains("ditoitruyna") || it.contains("truyna") }?.let {
                                 wantedPoint = PointF(it.exactCenterX() + cx, it.exactCenterY() + cy)
                             }
+                            if (!tapping) handler.post(spam)   // có vị trí mới thì bấm ngay, không chờ
                         }
                         .addOnCompleteListener {
                             cropped.recycle()
@@ -164,7 +165,7 @@ class NpcAccessibilityService : AccessibilityService() {
                 if (running) handler.post(spam)
             }
         }, handler)
-        if (!dispatched) { tapping = false; if (running) handler.postDelayed(spam, 10) }
+        if (!dispatched) { tapping = false; if (running) handler.post(spam) }
     }
 
     private fun normalize(s: String): String {
