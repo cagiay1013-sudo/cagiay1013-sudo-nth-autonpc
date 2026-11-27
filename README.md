@@ -65,4 +65,3 @@
 - v10: đồng hồ bấm giờ phút:giây.ms nằm ngang cạnh nút bật/tắt (chạm = chạy, chạm lần nữa = dừng và về 0). Hàng icon xếp ngang: ▶ | đồng hồ | ⚙.
 - v10.1: thêm icon app (adaptive + mipmap PNG), sửa chú thích vị trí nút ⚙.
 - v10.2: kéo đồng hồ để di chuyển cả hàng nút; rút gọn chú thích màn hình chính.
-- v11: tối ưu: R8 + shrink resources, chỉ ABI ARM, giải phóng bitmap sớm, đồng hồ dùng Choreographer, không quay CPU khi Android từ chối chụp quá nhanh. Release có thêm bản debug dự phòng NTH_AutoNPC_debug.apk.
